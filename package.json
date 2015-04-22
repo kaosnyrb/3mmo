@@ -1,0 +1,9 @@
+{
+  "name": "Simple MMO",
+  "version": "0.0.1",
+  "description": "A simple Three.js and Socket.io implementation of an mmo",
+  "dependencies": {
+    "express": "^4.10.2",
+    "socket.io": "^1.3.5"
+  }
+}

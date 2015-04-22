@@ -1,0 +1,175 @@
+<html>
+<head>
+	<style>
+		body { margin: 0; }
+	</style>
+	<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css"/>
+</head>
+
+<body>
+	<div id="canvas">
+	</div>
+	<div class="container" style="">
+	<input id="message" autocomplete="off" /><button id="SendButton" >Send</button>
+		<div id="ChatBox" style="overflow: scroll; max-height: 25%;">
+		<div>
+		
+	</div>
+	<script src="js/three.min.js"></script>
+	<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+	<script>	
+		//Add key event listeners
+		var keysDown = {};
+		addEventListener("keydown", function (e) {
+			keysDown[e.keyCode] = true;
+		}, false);
+		addEventListener("keyup", function (e) {
+			delete keysDown[e.keyCode];
+		}, false);
+
+		var objArray = new Array();
+		var playerArray = new Array();
+		
+		var Player = {};
+		var scene = new THREE.Scene();
+		var renderer = new THREE.WebGLRenderer();
+		var camera = new THREE.PerspectiveCamera( 75, (window.innerWidth / (window.innerHeight / 1.5)), 0.1, 1000 );
+		var camerarotation = 0;
+		
+		function CreateObject(position, size, texturePath, tiling)
+		{
+			var geometry = new THREE.BoxGeometry( size.x, size.y, size.z );
+			var texture = THREE.ImageUtils.loadTexture( texturePath);
+			texture.repeat.x = tiling;
+			texture.repeat.y = tiling;
+			texture.wrapS = THREE.RepeatWrapping;
+			texture.wrapT = THREE.RepeatWrapping;
+			var material = new THREE.MeshLambertMaterial( { map: texture } );
+			var cube = new THREE.Mesh( geometry, material );
+			cube.position.set( position.x,position.y,position.z);
+			scene.add( cube );
+			objArray.push(cube);
+			var id = objArray.length;
+			var GameObject = {};
+			GameObject.id = id;
+			GameObject.Object = cube;
+			GameObject.texture = texturePath;
+			return GameObject;
+		}
+		
+		function InitScene()
+		{
+			renderer.setSize( window.innerWidth, window.innerHeight / 1.5 );
+			
+			var ambientLight = new THREE.AmbientLight(0x444444);
+			scene.add(ambientLight);
+			  
+			var directionalLight = new THREE.DirectionalLight(0xffffff);
+			directionalLight.position.set(1, 1, 1).normalize();
+			scene.add(directionalLight);
+			
+			container = document.getElementById( 'canvas' );
+			container.appendChild( renderer.domElement );
+		}
+
+		function InputControls()
+		{
+			Player.Object.rotation.y = camerarotation;
+			var moved = false;
+			if (38 in keysDown) { // Player holding up
+				Player.Object.position.x -= Math.sin(camerarotation) /2;
+				Player.Object.position.z -= Math.cos(camerarotation) /2;
+				moved = true;
+			}
+			if (40 in keysDown){
+				Player.Object.position.x += Math.sin(camerarotation) /2;
+				Player.Object.position.z += Math.cos(camerarotation) /2;
+				moved = true;
+			}
+			if (37 in keysDown){
+				camerarotation += 0.1;
+				moved = true;
+			}
+			if (39 in keysDown){
+				camerarotation -= 0.1;
+				moved = true;
+			}
+			camera.position.x = Player.Object.position.x + Math.sin(camerarotation) * 20;
+			camera.position.z = Player.Object.position.z + Math.cos(camerarotation) * 20;
+			camera.position.y = 6;
+			camera.rotation.y = camerarotation;
+			
+			camera.updateMatrix();
+			if ( moved )
+			{
+				var positionEvent = {};
+				positionEvent.socketID = Player.socketID;
+				positionEvent.x = Player.Object.position.x;
+				positionEvent.z = Player.Object.position.z;
+				positionEvent.y = Player.Object.rotation.y;				
+				socket.emit('PositionUpdate', JSON.stringify(positionEvent));//Player.socketID + ',' + Player.Object.position.x + ',' + Player.Object.position.z + ',' + Player.Object.rotation.y);
+			}
+		}
+		function render() {
+			requestAnimationFrame( render );
+			renderer.render( scene, camera );
+			InputControls();
+		}
+		
+		
+		InitScene();
+		Player = CreateObject(new THREE.Vector3( 0, 0, -10 ),new THREE.Vector3( 5, 5, 1 ),'textures/rhino.gif',1);
+		Player.socketID = "";
+		
+		CreateObject(new THREE.Vector3( 0, -5, -10 ),new THREE.Vector3( 500, 5, 500 ),'textures/grass.jpg',30);
+		CreateObject(new THREE.Vector3( 50, 4, -10 ),new THREE.Vector3( 30, 30, 30 ),'textures/house.png',1);
+		render();
+		
+		//Socket.IO stuff
+		var socket = io();
+		socket.on('PlayerJoined', function(msg){
+			if (Player.socketID == "" )
+			{
+				Player.socketID = msg.toString();
+				$('#ChatBox').append("Joined as " + Player.socketID + "<br/>");
+			}});
+		
+	    socket.on('PositionUpdate', function(msg){
+				var messagejson = JSON.parse(msg);
+				var found = false;
+				playerArray.forEach(function(entry) {
+					if ( entry.socketID == messagejson.socketID)
+					{
+						entry.Object.position.x = messagejson.x;
+						entry.Object.position.z = messagejson.z;
+						entry.Object.rotation.y = messagejson.y;
+						found = true;
+					}
+				});
+				if (!found)
+				{
+					//We don't have this player object. create it.
+					var newplayer = CreateObject(new THREE.Vector3( messagejson.x, 0, messagejson.z ),new THREE.Vector3( 5, 5, 1 ),'textures/rhino.gif',1);
+					newplayer.socketID = messagejson.socketID;
+					playerArray.push(newplayer);
+				}
+			});
+		
+		socket.on('ChatMessage', function(msg){
+				var messagejson = JSON.parse(msg);
+				$('#ChatBox').append(messagejson.user + " : " + messagejson.text + "<br/>");
+				$('#ChatBox').animate({ scrollTop: $('#ChatBox').get(0).scrollHeight}, 2000);
+			});
+		
+		$('#SendButton').click(function() {
+			var chatMessage = {};
+			chatMessage.text = $('#message').val();
+			chatMessage.user = Player.socketID;
+			$('#message').val('');
+			socket.emit('ChatMessage', JSON.stringify(chatMessage));
+			return false;
+		});
+	</script>
+</body>
+</html>
