@@ -1,6 +1,17 @@
 var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
+var loki = require('lokijs'), db = new loki('chatlog.json');
+var users;
+
+db.loadDatabase({}, function () {
+  users = db.getCollection('users')
+  if ( users == null )
+  {
+	users = db.addCollection('users');
+  }
+  console.log('FIND ' + users.find({'user' : '06d8954b6053'})[0].text);
+});
 
 //Static files
 app.get('/', function(req, res){
@@ -29,6 +40,8 @@ io.on('connection', function(socket){
   });
   socket.on('ChatMessage', function(msg){
 	io.emit('ChatMessage',msg);
+	users.insert(JSON.parse(msg));
+	db.saveDatabase();
     console.log('message: ' + msg);
   });
 });
@@ -37,6 +50,7 @@ http.listen(80, function(){
   console.log('listening on *:80');
 });
 
+//User id generation
 function guid() {
   function s4() {
     return Math.floor((1 + Math.random()) * 0x10000)

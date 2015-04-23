@@ -28,15 +28,32 @@
 			delete keysDown[e.keyCode];
 		}, false);
 
+		//Globals
 		var objArray = new Array();
-		var playerArray = new Array();
-		
+		var playerArray = new Array();		
 		var Player = {};
 		var scene = new THREE.Scene();
 		var renderer = new THREE.WebGLRenderer();
 		var camera = new THREE.PerspectiveCamera( 75, (window.innerWidth / (window.innerHeight / 1.5)), 0.1, 1000 );
 		var camerarotation = 0;
 		
+		//Inital scene setup, Lighting and canvas
+		function InitScene()
+		{
+			renderer.setSize( window.innerWidth, window.innerHeight / 1.5 );
+			
+			var ambientLight = new THREE.AmbientLight(0x444444);
+			scene.add(ambientLight);
+			  
+			var directionalLight = new THREE.DirectionalLight(0xffffff);
+			directionalLight.position.set(1, 1, 1).normalize();
+			scene.add(directionalLight);
+			
+			container = document.getElementById( 'canvas' );
+			container.appendChild( renderer.domElement );
+		}
+		
+		//Spawn an object and add it to the scene
 		function CreateObject(position, size, texturePath, tiling)
 		{
 			var geometry = new THREE.BoxGeometry( size.x, size.y, size.z );
@@ -57,22 +74,8 @@
 			GameObject.texture = texturePath;
 			return GameObject;
 		}
-		
-		function InitScene()
-		{
-			renderer.setSize( window.innerWidth, window.innerHeight / 1.5 );
-			
-			var ambientLight = new THREE.AmbientLight(0x444444);
-			scene.add(ambientLight);
-			  
-			var directionalLight = new THREE.DirectionalLight(0xffffff);
-			directionalLight.position.set(1, 1, 1).normalize();
-			scene.add(directionalLight);
-			
-			container = document.getElementById( 'canvas' );
-			container.appendChild( renderer.domElement );
-		}
 
+		//Update loop
 		function InputControls()
 		{
 			Player.Object.rotation.y = camerarotation;
@@ -82,7 +85,7 @@
 				Player.Object.position.z -= Math.cos(camerarotation) /2;
 				moved = true;
 			}
-			if (40 in keysDown){
+			if (40 in keysDown){ // Player holding down
 				Player.Object.position.x += Math.sin(camerarotation) /2;
 				Player.Object.position.z += Math.cos(camerarotation) /2;
 				moved = true;
@@ -95,12 +98,14 @@
 				camerarotation -= 0.1;
 				moved = true;
 			}
+			//Move the camera
 			camera.position.x = Player.Object.position.x + Math.sin(camerarotation) * 20;
 			camera.position.z = Player.Object.position.z + Math.cos(camerarotation) * 20;
 			camera.position.y = 6;
 			camera.rotation.y = camerarotation;
-			
+			//Update the cameras matrix (commits the changes to the scene)
 			camera.updateMatrix();
+			//Send and update event to the server if we have moved
 			if ( moved )
 			{
 				var positionEvent = {};
@@ -111,6 +116,7 @@
 				socket.emit('PositionUpdate', JSON.stringify(positionEvent));//Player.socketID + ',' + Player.Object.position.x + ',' + Player.Object.position.z + ',' + Player.Object.rotation.y);
 			}
 		}
+		//Sets the renderloop up.
 		function render() {
 			requestAnimationFrame( render );
 			renderer.render( scene, camera );
